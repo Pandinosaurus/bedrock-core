@@ -6,8 +6,8 @@
     "node": ">=10"
   },
   "scripts": {
-    "build": "NODE_ENV=production NODE_OPTIONS=\"--max-old-space-size=4096\" webpack",
-    "start": "node ./serve/dev",
+    "build": "vite build",
+    "start": "vite",
     "static": "node ./serve/static",
     "lint": "eslint",
     "test": "jest",
@@ -64,6 +64,7 @@
     "semantic-ui-react": "^2.0.3",
     "style-loader": "^2.0.0",
     "terser-webpack-plugin": "^5.2.4",
+    "vite": "^2.6.14",
     "webpack": "^5.54.0",
     "webpack-cli": "^4.8.0",
     "webpack-dev-middleware": "^5.2.1",

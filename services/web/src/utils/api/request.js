@@ -1,4 +1,4 @@
-import { API_URL } from 'utils/env';
+import { API_URL } from 'utils/env.js';
 import { ApiError, ApiParseError } from './errors';
 import { trackRequest } from '../analytics';
 import { getToken } from './token';
