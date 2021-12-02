@@ -6,6 +6,7 @@
 // - Bare minimum build: initial: ~4s rebuild: ~1.2s
 
 export default {
+  mode: 'development',
   resolve: {
     alias: {
       // Needed as resolve.modules is not a thing with vite

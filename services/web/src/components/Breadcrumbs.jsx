@@ -8,7 +8,6 @@ export default class Breadcrumbs extends React.Component {
   getPath() {
     const { link, path } = this.props;
     return link ? [link] : path;
-    console.info('ohaalskdfjazz');
   }
 
   render() {
