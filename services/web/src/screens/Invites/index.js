@@ -1,17 +1,17 @@
 import React from 'react';
 import { Table, Button, Divider, Segment } from 'semantic';
 
-import { request } from 'utils/api';
-import { formatDateTime } from 'utils/date';
 import screen from 'helpers/screen';
+
 import InviteUser from 'modals/InviteUser';
-import {
-  Search,
-  Layout,
-  LoadButton,
-  Breadcrumbs,
-  SearchFilters,
-} from 'components';
+import Search from 'components/Search';
+import Layout from 'components/Layout';
+import LoadButton from 'components/LoadButton';
+import Breadcrumbs from 'components/Breadcrumbs';
+import SearchFilters from 'components/Search/Filters';
+
+import { formatDateTime } from 'utils/date';
+import { request } from 'utils/api';
 
 @screen
 export default class Home extends React.Component {
@@ -90,7 +90,7 @@ export default class Home extends React.Component {
 
                   <Layout horizontal stackable center right>
                     <Search.Total />
-                    <SearchFilters.Search name="keyword" />
+                    <SearchFilters.Keyword />
                   </Layout>
                 </Layout>
               </Segment>

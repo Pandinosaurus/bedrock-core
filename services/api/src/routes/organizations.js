@@ -1,26 +1,15 @@
-const mongoose = require('mongoose');
 const Router = require('@koa/router');
+const { fetchByParam } = require('../utils/middleware/params');
 const { validateBody } = require('../utils/middleware/validate');
-const { authenticate, fetchUser } = require('../utils/middleware/authenticate');
+const { authenticate } = require('../utils/middleware/authenticate');
 const { requirePermissions } = require('../utils/middleware/permissions');
 const { Organization } = require('../models');
 
 const router = new Router();
 
 router
-  .use(authenticate({ type: 'user' }))
-  .use(fetchUser)
-  .param('organizationId', async (id, ctx, next) => {
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      ctx.throw(404);
-    }
-    const organization = await Organization.findById(id);
-    ctx.state.organization = organization;
-    if (!organization) {
-      ctx.throw(404);
-    }
-    return next();
-  })
+  .use(authenticate())
+  .param('id', fetchByParam(Organization))
   .post('/mine/search', async (ctx) => {
     const { authUser } = ctx.state;
     const { body } = ctx.request;
@@ -43,13 +32,13 @@ router
       meta,
     };
   })
-  .get('/:organizationId', async (ctx) => {
+  .get('/:id', async (ctx) => {
     const organization = ctx.state.organization;
     ctx.body = {
       data: organization,
     };
   })
-  .use(requirePermissions({ endpoint: 'organizations', permission: 'read', scope: 'global' }))
+  .use(requirePermissions('organizations.read'))
   .post('/search', validateBody(Organization.getSearchValidation()), async (ctx) => {
     const { data, meta } = await Organization.search(ctx.request.body);
     ctx.body = {
@@ -57,14 +46,14 @@ router
       meta,
     };
   })
-  .use(requirePermissions({ endpoint: 'organizations', permission: 'write', scope: 'global' }))
+  .use(requirePermissions('organizations.write'))
   .post('/', validateBody(Organization.getCreateValidation()), async (ctx) => {
     const organization = await Organization.create(ctx.request.body);
     ctx.body = {
       data: organization,
     };
   })
-  .patch('/:organizationId', validateBody(Organization.getUpdateValidation()), async (ctx) => {
+  .patch('/:id', validateBody(Organization.getUpdateValidation()), async (ctx) => {
     const organization = ctx.state.organization;
     organization.assign(ctx.request.body);
     await organization.save();
@@ -72,7 +61,7 @@ router
       data: organization,
     };
   })
-  .delete('/:organizationId', async (ctx) => {
+  .delete('/:id', async (ctx) => {
     await ctx.state.organization.delete();
     ctx.status = 204;
   });

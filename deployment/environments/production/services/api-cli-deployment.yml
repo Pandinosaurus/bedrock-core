@@ -13,13 +13,9 @@ spec:
         app: api-cli
     spec:
       containers:
-        - image: gcr.io/bedrock-foundation/bedrock-core-services-api-cli
+        - image: gcr.io/bedrock-foundation-production/bedrock-core-services-api-cli
           imagePullPolicy: Always
           name: api-cli
-          # resources:
-          #   limits:
-          #     cpu: "1000m"
-          #     memory: "4Gi"
           env:
             - name: ENV_NAME
               value: "production"
@@ -38,7 +34,7 @@ spec:
             - name: UPLOADS_STORE
               value: "gcs"
             - name: UPLOADS_GCS_BUCKET
-              value: "bedrock-production-uploads"
+              value: "bedrock-foundation-production-uploads"
             # The `bedrock cloud` command in the CLI will help with
             # the creation and storing of secrets for production.
             - name: JWT_SECRET
@@ -51,9 +47,3 @@ spec:
                 secretKeyRef:
                   name: secrets
                   key: POSTMARK_API_KEY
-          volumeMounts:
-            - name: jobs-cache
-              mountPath: /workdir/data
-      volumes:
-        - name: jobs-cache
-          emptyDir: {}

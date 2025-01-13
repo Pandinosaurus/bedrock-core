@@ -2,10 +2,11 @@ import React from 'react';
 import { union } from 'lodash';
 import { Form, Loader, Popup, Icon, Modal, Button } from 'semantic';
 
-import { request } from 'utils/api';
 import SearchDropdown from 'components/SearchDropdown';
 import ErrorMessage from 'components/ErrorMessage';
 import FetchObject from 'components/FetchObject';
+
+import { request } from 'utils/api';
 
 export default class Roles extends React.Component {
   constructor(props) {
@@ -40,6 +41,7 @@ export default class Roles extends React.Component {
   }
 
   setGlobalValues(values) {
+    const { name } = this.props;
     const otherRoles = this.state.roles.filter(
       (role) => role.scope !== 'global'
     );
@@ -54,7 +56,7 @@ export default class Roles extends React.Component {
     this.setState({
       roles,
     });
-    this.props.onChange(undefined, { value: roles });
+    this.props.onChange(undefined, { name, value: roles });
   }
 
   getGlobalValues() {

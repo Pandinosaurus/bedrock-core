@@ -12,12 +12,18 @@ import {
 import { set, truncate } from 'lodash';
 import { withRouter } from 'react-router-dom';
 
-import { request } from 'utils/api';
 import screen from 'helpers/screen';
-import { Layout, Search, SearchFilters } from 'components';
-import { formatDateTime } from 'utils/date';
-import CodeBlock from 'components/Markdown/Code';
+
+import { PageContext } from 'stores/page';
+
+import SearchFilters from 'components/Search/Filters';
+import Layout from 'components/Layout';
+import Search from 'components/Search';
 import ShowRequest from 'modals/ShowRequest';
+import Code from 'components/Code';
+
+import { formatDateTime } from 'utils/date';
+import { request } from 'utils/api';
 
 import Menu from './Menu';
 
@@ -34,6 +40,8 @@ function getStateromQueryString(search) {
 @withRouter
 @screen
 export default class ApplicationLogs extends React.Component {
+  static contextType = PageContext;
+
   state = {
     selectedItem: null,
     initialFilters: getStateromQueryString(this.props.location.search),
@@ -55,17 +63,16 @@ export default class ApplicationLogs extends React.Component {
       set(body, 'request.method'.split('.'), body['request.method']);
     }
 
+    const { application } = this.context;
+
     const resp = await request({
       method: 'POST',
-      path: `/1/applications/${this.props.application.id}/logs/search`,
+      path: `/1/applications/${application.id}/logs/search`,
       body,
     });
-    this.setState(
-      {
-        selectedItem: resp.data[0],
-      },
-      () => this.updateQueryString()
-    );
+    this.setState({
+      selectedItem: resp.data[0],
+    });
 
     return resp;
   };
@@ -77,15 +84,8 @@ export default class ApplicationLogs extends React.Component {
     return 'green';
   }
 
-  updateQueryString() {
-    const pathName = this.props.location.pathname;
-    const queryString = this.state.selectedItem
-      ? `?requestId=${this.state.selectedItem.requestId}`
-      : '';
-    this.props.history.replace(`${pathName}${queryString}`);
-  }
-
   render() {
+    const { application } = this.context;
     const { selectedItem } = this.state;
 
     return (
@@ -101,13 +101,7 @@ export default class ApplicationLogs extends React.Component {
                   <Grid.Row>
                     <Grid.Column width={9}>
                       <Layout horizontal>
-                        <SearchFilters.Search
-                          style={{
-                            width: '300px',
-                          }}
-                          name="keyword"
-                          placeholder="Filter by Path or Request Id"
-                        />
+                        <SearchFilters.Keyword placeholder="Filter by Path or Request Id" />
                         <Divider hidden vertical />
                         <SearchFilters.Dropdown
                           style={{
@@ -122,7 +116,7 @@ export default class ApplicationLogs extends React.Component {
                                 gte: 200,
                                 lt: 300,
                               }),
-                              text: 'Succeesed',
+                              text: 'Succeeded',
                             },
                             {
                               value: JSON.stringify({
@@ -188,12 +182,9 @@ export default class ApplicationLogs extends React.Component {
                                         }),
                                   }}
                                   onClick={() =>
-                                    this.setState(
-                                      {
-                                        selectedItem: item,
-                                      },
-                                      () => this.updateQueryString()
-                                    )
+                                    this.setState({
+                                      selectedItem: item,
+                                    })
                                   }>
                                   <Grid.Column width={2}>
                                     <Label
@@ -234,7 +225,7 @@ export default class ApplicationLogs extends React.Component {
                           {truncate(selectedItem.request.path, { length: 28 })}
                           <ShowRequest
                             centered={false}
-                            application={this.props.application}
+                            application={application}
                             request={selectedItem.request}
                             requestId={selectedItem.requestId}
                             trigger={
@@ -288,16 +279,13 @@ export default class ApplicationLogs extends React.Component {
                         {selectedItem.response.body && (
                           <>
                             <h3>Response Body</h3>
-                            <CodeBlock
-                              height="500px"
-                              language="json"
-                              source={JSON.stringify(
+                            <Code language="json" scroll>
+                              {JSON.stringify(
                                 selectedItem.response.body,
                                 null,
                                 2
                               )}
-                              allowCopy
-                            />
+                            </Code>
                           </>
                         )}
                       </Grid.Column>

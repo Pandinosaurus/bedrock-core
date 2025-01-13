@@ -3,29 +3,30 @@ import { Image, Segment } from 'semantic-ui-react';
 import { Link } from 'react-router-dom';
 import { Table, Button, Divider } from 'semantic';
 
+import screen from 'helpers/screen';
+
+import HelpTip from 'components/HelpTip';
+import Search from 'components/Search';
+import Layout from 'components/Layout';
+import Breadcrumbs from 'components/Breadcrumbs';
+import SearchFilters from 'components/Search/Filters';
+
+import EditProduct from 'modals/EditProduct';
+
 import { formatDateTime } from 'utils/date';
 import { urlForUpload } from 'utils/uploads';
 import { formatUsd } from 'utils/currency';
 import { request } from 'utils/api';
-import screen from 'helpers/screen';
-import {
-  HelpTip,
-  Breadcrumbs,
-  Layout,
-  Search,
-  SearchFilters,
-} from 'components';
-import EditProduct from 'modals/EditProduct';
 
 import Actions from '../Actions';
 
 @screen
 export default class ProductList extends React.Component {
-  onDataNeeded = async (params) => {
+  onDataNeeded = async (body) => {
     return await request({
       method: 'POST',
       path: '/1/products/search',
-      body: { ...params },
+      body,
     });
   };
 
@@ -107,7 +108,7 @@ export default class ProductList extends React.Component {
 
                   <Layout horizontal stackable center right>
                     <Search.Total />
-                    <SearchFilters.Search name="keyword" />
+                    <SearchFilters.Keyword />
                   </Layout>
                 </Layout>
               </Segment>
@@ -123,7 +124,7 @@ export default class ProductList extends React.Component {
                         onClick={() => setSort('name')}>
                         Name
                       </Table.HeaderCell>
-                      <Table.HeaderCell>Images</Table.HeaderCell>
+                      <Table.HeaderCell>Image</Table.HeaderCell>
                       <Table.HeaderCell
                         onClick={() => setSort('priceUsd')}
                         sorted={getSorted('priceUsd')}>
@@ -145,6 +146,7 @@ export default class ProductList extends React.Component {
                   </Table.Header>
                   <Table.Body>
                     {products.map((product) => {
+                      const [image] = product.images;
                       return (
                         <Table.Row key={product.id}>
                           <Table.Cell>
@@ -153,10 +155,10 @@ export default class ProductList extends React.Component {
                             </Link>
                           </Table.Cell>
                           <Table.Cell textAlign="center">
-                            {product.images[0] && (
+                            {image && (
                               <Image
                                 size="tiny"
-                                src={urlForUpload(product.images[0], true)}
+                                src={urlForUpload(image, true)}
                               />
                             )}
                           </Table.Cell>
@@ -170,7 +172,7 @@ export default class ProductList extends React.Component {
                               trigger={<Button basic icon="pen-to-square" />}
                               onSave={reload}
                             />
-                            <Actions item={product} reload={reload} />
+                            <Actions product={product} reload={reload} />
                           </Table.Cell>
                         </Table.Row>
                       );

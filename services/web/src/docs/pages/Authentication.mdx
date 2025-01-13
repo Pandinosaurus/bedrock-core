@@ -1,0 +1,30 @@
+import Route from 'docs/components/Route';
+
+export const title = 'Authentication';
+
+# Authentication
+
+The authentication APIs provide different way to handle user authentication. The
+following subroutes are provided for each authentication flow:
+
+- [Password](/docs/password)
+- [Passkey](/docs/passkey)
+- [Google](/docs/google)
+- [Apple](/docs/apple)
+- [TOTP](/docs/totp)
+- [OTP](/docs/otp)
+
+Additional routes are provided for general authentication needs:
+
+## Logout
+
+This deauthenticates all tokens for the given user
+
+<Route route="POST /1/auth/logout" />
+
+## MFA Method
+
+Updates the MFA method for the user. Note that the methods `sms` or `email` are
+handled by [OTP](/docs/otp) routes and `totp` is handled by [TOTP](/docs/totp).
+
+<Route route="PATCH /1/auth/mfa-method" />

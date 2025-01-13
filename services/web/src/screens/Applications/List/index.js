@@ -2,10 +2,16 @@ import React from 'react';
 import { Table, Button, Message, Divider, Loader } from 'semantic';
 import { Link } from 'react-router-dom';
 
-import { request } from 'utils/api';
 import screen from 'helpers/screen';
+
+import Breadcrumbs from 'components/Breadcrumbs';
+import Layout from 'components/Layout';
+import Search from 'components/Search';
+import Confirm from 'components/Confirm';
+
 import EditApplication from 'modals/EditApplication';
-import { Breadcrumbs, Layout, Search, Confirm } from 'components';
+
+import { request } from 'utils/api';
 
 @screen
 export default class Applications extends React.Component {
@@ -27,7 +33,6 @@ export default class Applications extends React.Component {
                 link={<Link to="/applications">Applications</Link>}
                 active="Applications"
               />
-
               <Layout horizontal center spread>
                 <h1>My Applications</h1>
                 <Layout.Group>

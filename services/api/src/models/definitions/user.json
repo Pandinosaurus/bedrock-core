@@ -1,28 +1,5 @@
 {
   "attributes": {
-    "email": {
-      "type": "String",
-      "validate": "email",
-      "required": true,
-      "lowercase": true,
-      "trim": true
-    },
-    "roles": [
-      {
-        "role": {
-          "type": "String",
-          "required": true
-        },
-        "scope": {
-          "type": "String",
-          "required": true
-        },
-        "scopeRef": {
-          "type": "ObjectId",
-          "ref": "Organization"
-        }
-      }
-    ],
     "firstName": {
       "type": "String",
       "required": true,
@@ -33,113 +10,159 @@
       "required": true,
       "trim": true
     },
-    "timeZone": {
-      "type": "String"
-    },
-    "theme": {
+    "email": {
       "type": "String",
-      "enum": [
-        "dark",
-        "light",
-        "system"
-      ]
+      "validate": "email",
+      "lowercase": true,
+      "required": true,
+      "unique": true,
+      "trim": true
     },
-    "isDeveloper": {
+    "phone": {
+      "type": "String",
+      "validate": "phone",
+      "unique": true,
+      "trim": true
+    },
+    "emailVerified": {
       "type": "Boolean",
       "default": false
     },
-    "hashedPassword": {
-      "type": "String",
-      "readScopes": "none",
-      "writeScopes": "none"
+    "phoneVerified": {
+      "type": "Boolean",
+      "default": false
     },
-    "loginAttempts": {
-      "type": "Number",
-      "default": 0,
-      "readScopes": "none",
-      "writeScopes": "none"
-    },
-    "lastLoginAttemptAt": {
-      "type": "Date",
-      "readScopes": "none",
-      "writeScopes": "none"
-    },
-    "accessConfirmedAt": {
-      "type": "Date",
-      "writeScopes": "none"
-    },
-    "authInfo": [
+    "roles": [
       {
-        "lastUsedAt": {
-          "type": "Date",
-          "required": true,
-          "writeScopes": "none"
-        },
-        "userAgent": {
+        "role": {
           "type": "String",
-          "required": false,
-          "writeScopes": "none"
+          "required": true
         },
-        "ip": {
+        "scope": {
           "type": "String",
           "required": true,
-          "writeScopes": "none"
+          "enum": [
+            "global",
+            "organization"
+          ]
         },
-        "country": {
-          "type": "String",
-          "writeScopes": "none"
-        },
-        "iat": {
-          "type": "Date",
-          "required": true,
-          "writeScopes": "none"
-        },
-        "jti": {
-          "type": "String",
-          "required": true,
-          "writeScopes": "none"
-        },
-        "exp": {
-          "type": "Date",
-          "required": true,
-          "readScopes": "read",
-          "writeScopes": "none"
+        "scopeRef": {
+          "type": "ObjectId",
+          "ref": "Organization"
         }
       }
     ],
-    "tempTokenId": {
-      "type": "String",
-      "readScopes": "none",
-      "writeScopes": "none"
+    "isTester": {
+      "type": "Boolean",
+      "default": false
     },
-    "mfaBackupCodes": [
-      {
-        "type": "String",
-        "readScopes": "none",
-        "writeScopes": "none"
+    "$private": {
+      "type": "Scope",
+      "readAccess": "self",
+      "writeAccess": "none",
+      "attributes": {
+        "authenticators": [
+          {
+            "type": {
+              "type": "String",
+              "required": true,
+              "enum": [
+                "otp",
+                "totp",
+                "apple",
+                "google",
+                "passkey",
+                "password"
+              ]
+            },
+            "id": {
+              "type": "String",
+              "readAccess": "none"
+            },
+            "code": {
+              "type": "String",
+              "readAccess": "none"
+            },
+            "secret": {
+              "type": "String",
+              "readAccess": "none"
+            },
+            "publicKey": {
+              "type": "String",
+              "readAccess": "none"
+            },
+            "counter": {
+              "type": "Number",
+              "readAccess": "none"
+            },
+            "verifiedAt": {
+              "type": "Date",
+              "readAccess": "none"
+            },
+            "expiresAt": {
+              "type": "Date",
+              "readAccess": "none"
+            }
+          }
+        ],
+        "authTokens": [
+          {
+            "jti": {
+              "type": "String",
+              "required": true
+            },
+            "expiresAt": {
+              "type": "Date",
+              "required": true
+            },
+            "lastUsedAt": {
+              "type": "Date",
+              "required": true
+            },
+            "userAgent": {
+              "type": "String"
+            },
+            "ip": {
+              "type": "String"
+            },
+            "country": {
+              "type": "String"
+            }
+          }
+        ],
+        "mfaMethod": {
+          "type": "String",
+          "default": "none",
+          "enum": [
+            "none",
+            "email",
+            "totp",
+            "sms"
+          ]
+        },
+        "loginAttempts": {
+          "type": "Number",
+          "default": 0
+        },
+        "lastLoginAttemptAt": {
+          "type": "Date"
+        }
       }
-    ],
-    "mfaMethod": {
-      "type": "String",
-      "enum": [
-        "sms",
-        "otp"
-      ]
-    },
-    "mfaSecret": {
-      "type": "String",
-      "readScopes": "none",
-      "writeScopes": "none"
-    },
-    "mfaPhoneNumber": {
-      "type": "String",
-      "readScopes": "none",
-      "writeScopes": "none"
     }
   },
-  "search": [
-    "firstName",
-    "lastName",
-    "email"
-  ]
+  "onDelete": {
+    "errorOnReferenced": {
+      "except": [
+        "AuditEntry"
+      ]
+    }
+  },
+  "search": {
+    "fields": [
+      "firstName",
+      "lastName",
+      "email",
+      "phone"
+    ]
+  }
 }

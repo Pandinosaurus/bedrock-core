@@ -1,13 +1,5 @@
-const { setupDb, teardownDb, request, createUser } = require('../../utils/testing');
-const { Shop } = require('../../models');
-
-beforeAll(async () => {
-  await setupDb();
-});
-
-afterAll(async () => {
-  await teardownDb();
-});
+const { request, createUser, createAdmin } = require('../../utils/testing');
+const { Shop, AuditEntry } = require('../../models');
 
 describe('/1/shops', () => {
   describe('POST /search', () => {
@@ -60,25 +52,48 @@ describe('/1/shops', () => {
       const data = response.body.data;
       expect(response.status).toBe(200);
       expect(data.name).toBe('shop name');
-    });
-  });
 
-  describe('DELETE /:shop', () => {
-    it('should be able to delete shop', async () => {
-      const user = await createUser();
-      let shop = await Shop.create({
-        name: 'test 1',
-        description: 'Some description',
+      const auditEntry = await AuditEntry.findOne({
+        objectId: data.id,
       });
-      const response = await request('DELETE', `/1/shops/${shop.id}`, {}, { user });
-      expect(response.status).toBe(204);
-      shop = await Shop.findByIdDeleted(shop.id);
-      expect(shop.deletedAt).toBeDefined();
+      expect(auditEntry.activity).toBe('Created shop');
+      expect(auditEntry.actor).toEqual(user._id);
+      expect(auditEntry.ownerId).toBe(user.id);
+      expect(auditEntry.ownerType).toBe('User');
     });
   });
 
   describe('PATCH /:shop', () => {
-    it('should be able to update shop', async () => {
+    it('should be able to update shop as admin', async () => {
+      const admin = await createAdmin();
+      let shop = await Shop.create({
+        name: 'shop name',
+        description: 'Some description',
+      });
+      shop.name = 'new name';
+      const response = await request('PATCH', `/1/shops/${shop.id}`, shop.toJSON(), { user: admin });
+      expect(response.status).toBe(200);
+      expect(response.body.data.name).toBe('new name');
+      shop = await Shop.findById(shop.id);
+      expect(shop.name).toEqual('new name');
+    });
+
+    it('should be able to update shop as owner', async () => {
+      const owner = await createAdmin();
+      let shop = await Shop.create({
+        name: 'shop name',
+        description: 'Some description',
+        owner,
+      });
+      shop.name = 'new name';
+      const response = await request('PATCH', `/1/shops/${shop.id}`, shop.toJSON(), { user: owner });
+      expect(response.status).toBe(200);
+      expect(response.body.data.name).toBe('new name');
+      shop = await Shop.findById(shop.id);
+      expect(shop.name).toEqual('new name');
+    });
+
+    it('should not allow anyone to update shop', async () => {
       const user = await createUser();
       let shop = await Shop.create({
         name: 'shop name',
@@ -86,10 +101,62 @@ describe('/1/shops', () => {
       });
       shop.name = 'new name';
       const response = await request('PATCH', `/1/shops/${shop.id}`, shop.toJSON(), { user });
-      expect(response.status).toBe(200);
-      expect(response.body.data.name).toBe('new name');
-      shop = await Shop.findById(shop.id);
-      expect(shop.name).toEqual('new name');
+      expect(response.status).toBe(401);
+    });
+  });
+
+  describe('DELETE /:shop', () => {
+    it('should allow admin to delete shop', async () => {
+      const admin = await createAdmin();
+      const owner = await createUser();
+      let shop = await Shop.create({
+        name: 'test 1',
+        description: 'Some description',
+        owner: owner.id,
+      });
+      const response = await request('DELETE', `/1/shops/${shop.id}`, {}, { user: admin });
+      expect(response.status).toBe(204);
+      shop = await Shop.findByIdDeleted(shop.id);
+      expect(shop.deletedAt).toBeDefined();
+
+      const auditEntry = await AuditEntry.findOne({
+        objectId: shop.id,
+      });
+      expect(auditEntry.activity).toBe('Deleted shop');
+      expect(auditEntry.actor).toEqual(admin._id);
+      expect(auditEntry.ownerId).toBe(owner.id);
+    });
+
+    it('should allow owner to delete shop', async () => {
+      const owner = await createUser();
+      let shop = await Shop.create({
+        name: 'test 1',
+        description: 'Some description',
+        owner: owner.id,
+      });
+      const response = await request('DELETE', `/1/shops/${shop.id}`, {}, { user: owner });
+      expect(response.status).toBe(204);
+      shop = await Shop.findByIdDeleted(shop.id);
+      expect(shop.deletedAt).toBeDefined();
+
+      const auditEntry = await AuditEntry.findOne({
+        objectId: shop.id,
+      });
+      expect(auditEntry.activity).toBe('Deleted shop');
+      expect(auditEntry.actor).toEqual(owner._id);
+      expect(auditEntry.ownerId).toBe(owner.id);
+    });
+
+    it('should not allow anyone to delete shop', async () => {
+      const user = await createUser();
+      const owner = await createUser();
+      let shop = await Shop.create({
+        name: 'test 1',
+        description: 'Some description',
+        owner: owner.id,
+      });
+      const response = await request('DELETE', `/1/shops/${shop.id}`, {}, { user });
+      expect(response.status).toBe(401);
     });
   });
 });

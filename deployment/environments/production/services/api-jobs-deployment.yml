@@ -13,13 +13,9 @@ spec:
         app: api-jobs
     spec:
       containers:
-        - image: gcr.io/bedrock-foundation/bedrock-core-services-api-jobs
+        - image: gcr.io/bedrock-foundation-production/bedrock-core-services-api-jobs
           imagePullPolicy: Always
           name: main
-          # resources:
-          #   limits:
-          #     cpu: "1000m"
-          #     memory: "4Gi"
           command:
             - /service/scripts/entrypoints/jobs.sh
           args:
@@ -35,9 +31,3 @@ spec:
               value: "no-reply@bedrock.foundation"
             - name: POSTMARK_API_KEY
               value: "abc"
-          volumeMounts:
-            - name: cache
-              mountPath: /service/data
-      volumes:
-        - name: cache
-          emptyDir: {}

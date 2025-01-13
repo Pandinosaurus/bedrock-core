@@ -16,14 +16,10 @@ spec:
         - image: dominiek/mongodb-backups
           imagePullPolicy: Always
           name: main
-          # resources:
-          #   limits:
-          #     cpu: "1000m"
-          #     memory: "4Gi"
           env:
             - name: MONGO_HOST
               value: "mongo"
             - name: MONGO_DB
               value: "bedrock_staging"
             - name: BACKUPS_GS_BUCKET
-              value: "bedrock-staging-mongodb-backups"
+              value: "bedrock-foundation-staging-mongodb-backups"

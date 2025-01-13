@@ -13,15 +13,11 @@ spec:
         app: bucket-storage-backups
     spec:
       containers:
-        - image: dominiek/bucket-storage-backups
+        - image: bedrockio/bucket-storage-backups
           imagePullPolicy: Always
           name: main
-          # resources:
-          #   limits:
-          #     cpu: "1000m"
-          #     memory: "4Gi"
           env:
             - name: SOURCE_GS_BUCKET
-              value: "bedrock-staging-uploads"
+              value: "bedrock-foundation-staging-uploads"
             - name: DESTINATION_GS_BUCKET
-              value: "bedrock-staging-uploads-backup"
+              value: "bedrock-foundation-staging-uploads-backup"

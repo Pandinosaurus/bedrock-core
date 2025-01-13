@@ -1,21 +1,36 @@
 import { CustomError } from 'utils/error';
 
 export class ApiError extends CustomError {
-  constructor(message, type, status, details) {
+  constructor(message, type, status, response) {
     super(message);
     this.type = type;
     this.status = status;
-    this.details = details;
+    this.response = response;
   }
 
-  getField(field) {
-    return this.details?.find((d) => {
-      return d.context.key === field;
+  getField(name) {
+    return this.response?.error?.details?.find((d) => {
+      return d.field === name;
     });
   }
 
-  hasField(field) {
-    return !!this.getField(field);
+  getFieldDetails(name) {
+    const field = this.getField(name);
+    if (field) {
+      return getAllDetails(field);
+    }
+  }
+
+  hasField(name) {
+    return !!this.getField(name);
+  }
+}
+
+function getAllDetails(error) {
+  if (error.details) {
+    return error.details.flatMap(getAllDetails);
+  } else {
+    return [error];
   }
 }
 

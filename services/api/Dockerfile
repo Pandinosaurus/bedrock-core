@@ -1,4 +1,4 @@
-FROM node:16.13.0-alpine
+FROM node:20.12.2-alpine
 
 # Yarn will not install any package listed in devDependencies if the NODE_ENV
 # environment variable is set to production. Use this flag to instruct Yarn to
@@ -24,10 +24,10 @@ RUN --mount=type=cache,target=/root/.yarn YARN_CACHE_FOLDER=/root/.yarn yarn ins
 COPY . .
 
 # Set your port
-ENV PORT 2300
+ENV PORT=2300
 
 # Expose the port to outside world
 EXPOSE 2300
 
 # Start production server
-CMD ["yarn", "start:production"]
+CMD ["yarn", "-s", "start:production"]

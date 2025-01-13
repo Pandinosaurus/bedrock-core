@@ -1,11 +1,14 @@
 import React from 'react';
-import { Segment, Grid } from 'semantic';
+import { Segment, Grid, Button } from 'semantic';
 import { Link } from 'react-router-dom';
 
-import { request } from 'utils/api';
-import { withSession } from 'stores';
+import { withSession } from 'stores/session';
+
 import screen from 'helpers/screen';
+
 import LogoTitle from 'components/LogoTitle';
+
+import { request } from 'utils/api';
 import { getUrlToken } from 'utils/token';
 
 import Form from './Form';
@@ -26,6 +29,10 @@ export default class AcceptInvite extends React.Component {
     };
   }
 
+  onLogoutClick = () => {
+    this.context.logout(true);
+  };
+
   onSubmit = async (body) => {
     try {
       const { token } = this.state;
@@ -35,11 +42,12 @@ export default class AcceptInvite extends React.Component {
       });
       const { data } = await request({
         method: 'POST',
-        path: '/1/auth/accept-invite',
+        path: '/1/invites/accept',
         token,
         body,
       });
-      this.props.history.push(await this.context.authenticate(data.token));
+      const next = await this.context.authenticate(data.token);
+      this.props.history.push(next);
     } catch (error) {
       this.setState({
         error,
@@ -49,6 +57,29 @@ export default class AcceptInvite extends React.Component {
   };
 
   render() {
+    if (this.context.isLoggedIn()) {
+      return this.renderLoggedIn();
+    } else {
+      return this.renderLoggedOut();
+    }
+  }
+
+  renderLoggedIn() {
+    return (
+      <React.Fragment>
+        <h1>Accept Invite</h1>
+        <p>
+          Invites can only be accepted from a logged out state. Would you like
+          to logout and accept the invite?
+        </p>
+        <div>
+          <Button onClick={this.onLogoutClick} content="Continue" />
+        </div>
+      </React.Fragment>
+    );
+  }
+
+  renderLoggedOut() {
     const { payload, error, loading } = this.state;
     return (
       <React.Fragment>
@@ -56,8 +87,13 @@ export default class AcceptInvite extends React.Component {
         <Segment.Group>
           <Segment padded>
             <div className="wrapper">
-              <p>This invite is intended for {payload?.email}</p>
-              <Form onSubmit={this.onSubmit} error={error} loading={loading} />
+              <p>This invite is intended for {payload?.sub}</p>
+              <Form
+                payload={payload}
+                onSubmit={this.onSubmit}
+                error={error}
+                loading={loading}
+              />
             </div>
           </Segment>
           <Segment secondary>

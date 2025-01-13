@@ -3,18 +3,19 @@ import { memoize } from 'lodash';
 import { Link } from 'react-router-dom';
 import { Table, Button, Label, Divider, Segment } from 'semantic';
 
+import screen from 'helpers/screen';
+
+import HelpTip from 'components/HelpTip';
+import Breadcrumbs from 'components/Breadcrumbs';
+import Layout from 'components/Layout';
+import Search from 'components/Search';
+import SearchFilters from 'components/Search/Filters';
+
+import EditUser from 'modals/EditUser';
+
 import { formatDateTime } from 'utils/date';
 import { request } from 'utils/api';
-import screen from 'helpers/screen';
 import { formatRoles } from 'utils/permissions';
-import {
-  HelpTip,
-  Breadcrumbs,
-  Layout,
-  Search,
-  SearchFilters,
-} from 'components';
-import EditUser from 'modals/EditUser';
 
 import Actions from '../Actions';
 
@@ -72,8 +73,8 @@ export default class UserList extends React.Component {
             .join(', ');
         },
       },
-      isDeveloper: {
-        label: 'Is Developer',
+      isTester: {
+        label: 'Is Tester',
         type: 'boolean',
       },
       createdAt: {
@@ -115,10 +116,7 @@ export default class UserList extends React.Component {
                       onDataNeeded={this.fetchRoles}
                     />
 
-                    <SearchFilters.Checkbox
-                      label="Is Developer"
-                      name="isDeveloper"
-                    />
+                    <SearchFilters.Checkbox label="Is Tester" name="isTester" />
 
                     <SearchFilters.DateRange
                       label="Created At"
@@ -128,10 +126,7 @@ export default class UserList extends React.Component {
 
                   <Layout horizontal stackable center right>
                     <Search.Total />
-                    <SearchFilters.Search
-                      placeholder="Enter name, email, or user id"
-                      name="keyword"
-                    />
+                    <SearchFilters.Keyword placeholder="Enter name, email, phone, or user id" />
                   </Layout>
                 </Layout>
               </Segment>
@@ -152,6 +147,11 @@ export default class UserList extends React.Component {
                         onClick={() => setSort('email')}
                         sorted={getSorted('email')}>
                         Email
+                      </Table.HeaderCell>
+                      <Table.HeaderCell
+                        onClick={() => setSort('phoneNumber')}
+                        sorted={getSorted('phoneNumber')}>
+                        Phone Number
                       </Table.HeaderCell>
                       <Table.HeaderCell
                         onClick={() => setSort('roles')}
@@ -180,11 +180,12 @@ export default class UserList extends React.Component {
                             <Link to={`/users/${user.id}`}>{user.name}</Link>
                           </Table.Cell>
                           <Table.Cell>{user.email}</Table.Cell>
+                          <Table.Cell>{user.phoneNumber || 'N / A'}</Table.Cell>
                           <Table.Cell>
                             {formatRoles(user.roles).map((label) => (
                               <Label
-                                key={label.key}
                                 {...label}
+                                key={label.key}
                                 style={{
                                   marginBottom: '3px',
                                   marginLeft: 0,
@@ -208,7 +209,7 @@ export default class UserList extends React.Component {
                               }
                               onSave={reload}
                             />
-                            <Actions item={user} reload={reload} />
+                            <Actions user={user} reload={reload} />
                           </Table.Cell>
                         </Table.Row>
                       );

@@ -2,9 +2,10 @@ import React from 'react';
 
 import { Message, Modal, Button } from 'semantic';
 
+import modal from 'helpers/modal';
+
 import { JWT_KEY, request } from 'utils/api';
 
-import modal from 'helpers/modal';
 
 @modal
 export default class LoginAsUser extends React.Component {
@@ -57,9 +58,16 @@ export default class LoginAsUser extends React.Component {
         </Modal.Content>
         <Modal.Actions>
           {!isReady && (
-            <Button primary fluid loading={loading} onClick={this.onConfigure}>
-              Authenticate
-            </Button>
+            <>
+              <Button
+                style={{ marginLeft: 0 }}
+                primary
+                fluid
+                loading={loading}
+                onClick={this.onConfigure}>
+                Authenticate
+              </Button>
+            </>
           )}
 
           {isReady && (
@@ -71,6 +79,7 @@ export default class LoginAsUser extends React.Component {
               </p>
 
               <Button
+                style={{ marginLeft: 0 }}
                 basic={!token}
                 primary={token}
                 fluid
