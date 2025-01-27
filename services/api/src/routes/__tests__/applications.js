@@ -1,20 +1,12 @@
-const { setupDb, teardownDb, request, createUser, createAdminUser } = require('../../utils/testing');
+const { request, createUser, createAdmin } = require('../../utils/testing');
 const { uniqueId } = require('lodash');
 const { Application, AuditEntry } = require('../../models');
-
-beforeAll(async () => {
-  await setupDb();
-});
-
-afterAll(async () => {
-  await teardownDb();
-});
 
 describe('/1/applications', () => {
   describe('POST /mine/search', () => {
     it('should list applications for a given user', async () => {
-      const admin = await createAdminUser();
-      const otherAdmin = await createAdminUser();
+      const admin = await createAdmin();
+      const otherAdmin = await createAdmin();
       const application = await Application.create({
         name: 'my application',
         user: admin.id,
@@ -42,7 +34,7 @@ describe('/1/applications', () => {
 
   describe('POST /:application/logs/search', () => {
     it('should list logs', async () => {
-      const admin = await createAdminUser();
+      const admin = await createAdmin();
       const application = await Application.create({
         name: 'my application',
         user: admin.id,
@@ -56,7 +48,7 @@ describe('/1/applications', () => {
 
   describe('GET /:application', () => {
     it('should get an application', async () => {
-      const admin = await createAdminUser();
+      const admin = await createAdmin();
       const application = await Application.create({
         name: 'my application',
         user: admin.id,
@@ -69,7 +61,7 @@ describe('/1/applications', () => {
 
   describe('POST /', () => {
     it('should allow creation', async () => {
-      const admin = await createAdminUser();
+      const admin = await createAdmin();
       const response = await request(
         'POST',
         '/1/applications',
@@ -82,15 +74,18 @@ describe('/1/applications', () => {
       const application = await Application.findOne({ _id: response.body.data.id });
       expect(application.name).toBe('bob');
 
-      const auditEntry = await AuditEntry.findOne({ objectId: application.id });
-      expect(auditEntry.activity).toBe('Created Application');
-      expect(auditEntry.user.id).toBe(admin.id);
+      const auditEntry = await AuditEntry.findOne({
+        objectId: application.id,
+      });
+      expect(auditEntry.activity).toBe('Created application');
+      expect(auditEntry.actor).toEqual(admin._id);
+      expect(auditEntry.ownerId).toBe(admin.id);
     });
   });
 
   describe('PATCH /:application', () => {
     it('should patch an application', async () => {
-      const admin = await createAdminUser();
+      const admin = await createAdmin();
       const application = await Application.create({
         name: 'patch-application',
         user: admin.id,
@@ -110,9 +105,12 @@ describe('/1/applications', () => {
       const dbApplication = await Application.findOne({ _id: response.body.data.id });
       expect(dbApplication.name).toBe('bob');
 
-      const auditEntry = await AuditEntry.findOne({ objectId: application.id });
-      expect(auditEntry.activity).toBe('Updated Application');
-      expect(auditEntry.user.id).toBe(admin.id);
+      const auditEntry = await AuditEntry.findOne({
+        objectId: application.id,
+        include: 'actor',
+      });
+      expect(auditEntry.activity).toBe('Updated application');
+      expect(auditEntry.actor.id).toBe(admin.id);
       expect(auditEntry.objectBefore).toEqual({
         name: 'patch-application',
       });
@@ -124,7 +122,7 @@ describe('/1/applications', () => {
 
   describe('DELETE /:application', () => {
     it('should delete application', async () => {
-      const admin = await createAdminUser();
+      const admin = await createAdmin();
       const application = await Application.create({
         name: 'patch-application',
         user: admin.id,
@@ -136,6 +134,12 @@ describe('/1/applications', () => {
 
       const dbApplication = await Application.findById(application.id);
       expect(dbApplication).toBe(null);
+
+      const auditEntry = await AuditEntry.findOne({
+        objectId: application.id,
+      });
+      expect(auditEntry.activity).toBe('Deleted application');
+      expect(auditEntry.actor).toEqual(admin._id);
     });
   });
 });

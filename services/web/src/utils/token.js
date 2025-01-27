@@ -1,5 +1,5 @@
 export function getUrlToken(param = 'token') {
-  const token = new URL(document.location).searchParams.get(param);
+  const token = new URLSearchParams(location.search).get(param);
   const payload = parseToken(token);
   return {
     token,
@@ -10,7 +10,7 @@ export function getUrlToken(param = 'token') {
 export function parseToken(token) {
   try {
     return JSON.parse(atob(token.split('.')[1]));
-  } catch (err) {
+  } catch {
     return null;
   }
 }

@@ -1,21 +1,32 @@
 import React from 'react';
-import { Form, Modal, Button, TextArea, Message } from 'semantic';
+import {
+  Form,
+  Modal,
+  Button,
+  TextArea,
+  Dropdown,
+  Divider,
+  Message,
+} from 'semantic';
 
-import { request } from 'utils/api';
-import { emailRegexp } from 'utils/validate';
 import modal from 'helpers/modal';
+
 import AutoFocus from 'components/AutoFocus';
 import ErrorMessage from 'components/ErrorMessage';
+
+import { emailRegexp } from 'utils/validate';
+import { request } from 'utils/api';
 
 @modal
 export default class InviteUser extends React.Component {
   state = {
     touched: false,
+    role: '',
     validEmails: [],
     invalidEmails: [],
   };
 
-  onChange = (e, { value }) => {
+  onInvitesChange = (e, { value }) => {
     const values = value
       .toLowerCase()
       .split(/[\s,;\t\n]+/)
@@ -39,6 +50,12 @@ export default class InviteUser extends React.Component {
     });
   };
 
+  onRoleChange = (e, { value }) => {
+    this.setState({
+      role: value,
+    });
+  };
+
   onSubmit = async () => {
     this.setState({
       loading: true,
@@ -46,13 +63,14 @@ export default class InviteUser extends React.Component {
       error: null,
     });
 
-    const { validEmails } = this.state;
+    const { role, validEmails } = this.state;
 
     try {
       await request({
         method: 'POST',
         path: '/1/invites',
         body: {
+          role,
           emails: validEmails,
         },
       });
@@ -68,7 +86,8 @@ export default class InviteUser extends React.Component {
   };
 
   render() {
-    const { validEmails, invalidEmails, touched, loading, error } = this.state;
+    const { validEmails, invalidEmails, role, touched, loading, error } =
+      this.state;
     return (
       <>
         <Modal.Header>Invite Users</Modal.Header>
@@ -85,8 +104,30 @@ export default class InviteUser extends React.Component {
                   style={{ height: '150px' }}
                   name="emails"
                   onBlur={() => this.setState({ touched: true })}
-                  onChange={this.onChange}
+                  onChange={this.onInvitesChange}
                   placeholder="Email address seperate by comma or newline .e.g first@gmail.com, second@gmail.com"
+                />
+                <Divider hidden />
+                <Dropdown
+                  selection
+                  name="role"
+                  value={role}
+                  placeholder="Choose Role"
+                  onChange={this.onRoleChange}
+                  options={[
+                    {
+                      text: 'Viewer',
+                      value: 'viewer',
+                    },
+                    {
+                      text: 'Admin',
+                      value: 'admin',
+                    },
+                    {
+                      text: 'Super Admin',
+                      value: 'superAdmin',
+                    },
+                  ]}
                 />
               </Form.Field>
             </Form>

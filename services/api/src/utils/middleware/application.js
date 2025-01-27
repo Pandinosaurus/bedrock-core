@@ -27,32 +27,32 @@ function isSimpleValue(value) {
 const protectedFields = /token|password|secret|hash|key|jwt|ping|payment|bank|iban/i;
 
 function redact(obj, prefix) {
-  Object.keys(obj).forEach(function (key) {
-    const value = obj[key];
+  const result = {};
+  for (let [key, value] of Object.entries(obj || {})) {
     const keyMatched = key.match(protectedFields);
     const simpleValue = isSimpleValue(value);
 
     if (keyMatched && simpleValue) {
-      obj[key] = '[redacted]';
+      result[key] = '[redacted]';
     } else if (keyMatched && Array.isArray(value) && typeof value[0] !== 'object') {
-      obj[key] = value.map(() => '[redacted]');
+      result[key] = value.map(() => '[redacted]');
     } else if (simpleValue) {
-      obj[key] = value;
+      result[key] = value;
     } else if (Array.isArray(value)) {
-      obj[key] = value.map((val) => {
+      result[key] = value.map((val) => {
         return isSimpleValue(val) ? val : redact(val);
       });
     } else if (typeof value === 'object') {
-      Object.assign(obj, redact(value, key));
+      Object.assign(result, redact(value, key));
     }
-  }, {});
+  }
 
   if (prefix) {
     return {
-      [prefix]: obj,
+      [prefix]: result,
     };
   }
-  return obj;
+  return result;
 }
 
 function truncate(body) {
@@ -68,6 +68,7 @@ function truncate(body) {
 function applicationMiddleware({ ignorePaths = [] }) {
   return async (ctx, next) => {
     const path = ctx.url;
+
     const isPathIgnored = ignorePaths.find((ignorePath) => {
       if (ignorePath instanceof RegExp) {
         return ignorePath.test(path);
@@ -79,13 +80,10 @@ function applicationMiddleware({ ignorePaths = [] }) {
       return next();
     }
 
-    const apiKey = ctx.get('apikey') || ctx.get('api-key') || ctx.get('api_key');
+    const apiKey = ctx.get('api-key');
+
     if (!apiKey) {
-      // This makes <img> tag work regardless of apikey, as its not possible a header for an image tag
-      if (ctx.get('accept').includes('image/') && ctx.method === 'GET') {
-        return next();
-      }
-      return ctx.throw(400, 'Missing "ApiKey" header');
+      return next();
     }
 
     const application = await Application.findOneAndUpdate(
@@ -96,7 +94,7 @@ function applicationMiddleware({ ignorePaths = [] }) {
     );
 
     if (!application) {
-      return ctx.throw(404, `The "ApiKey" did not match any known applications`);
+      return ctx.throw(400, `The "ApiKey" did not match any known applications`);
     }
 
     const requestId = `${application.apiKey}-${nanoid()}`;
@@ -108,11 +106,8 @@ function applicationMiddleware({ ignorePaths = [] }) {
 
     let responseBody;
     if (response.get('Content-Type')?.includes('application/json')) {
-      // this is bit unlucky
-      // we need to stringify the doc to avoid having all kind of prototypes / bson id / other mongonse wrappers
-      // perhaps its worth considering https://developer.mozilla.org/en-US/docs/Web/API/structuredClone when move to node 17+
-      const convertBody = JSON.parse(JSON.stringify(response.body));
-      responseBody = redact(truncate(convertBody));
+      // Response body is assumed to be serialized.
+      responseBody = redact(truncate(response.body));
     }
 
     // This could be done as upsert

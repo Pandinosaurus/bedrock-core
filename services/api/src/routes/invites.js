@@ -1,45 +1,92 @@
-const mongoose = require('mongoose');
 const Router = require('@koa/router');
-const Joi = require('joi');
+const yd = require('@bedrockio/yada');
+const { fetchByParam } = require('../utils/middleware/params');
 const { validateBody } = require('../utils/middleware/validate');
-const { authenticate, fetchUser } = require('../utils/middleware/authenticate');
+const { validateToken } = require('../utils/middleware/tokens');
+const { authenticate } = require('../utils/middleware/authenticate');
 const { requirePermissions } = require('../utils/middleware/permissions');
+
+const { register } = require('../utils/auth');
+const { createAuthToken } = require('../utils/auth/tokens');
 const { Invite, User } = require('../models');
 
-const { sendTemplatedMail } = require('../utils/mailer');
-const { createTemporaryToken } = require('../utils/tokens');
+const mailer = require('../utils/messaging/mailer');
+const { createInviteToken } = require('../utils/auth/tokens');
 
 const router = new Router();
 
-function getToken(invite) {
-  return createTemporaryToken({ type: 'invite', inviteId: invite._id, email: invite.email });
-}
-
 function sendInvite(sender, invite) {
-  return sendTemplatedMail({
+  const token = createInviteToken(invite);
+  return mailer.sendMail({
     to: invite.email,
-    file: 'invite.md',
+    template: 'invite.md',
     sender,
-    token: getToken(invite),
+    token,
   });
 }
 
 router
-  .param('inviteId', async (id, ctx, next) => {
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      ctx.throw(404);
-    }
-    const invite = await Invite.findById(id);
-    if (!invite) {
-      ctx.throw(404);
-    }
-    ctx.state.invite = invite;
+  .post(
+    '/accept',
+    validateBody({
+      firstName: yd.string().required(),
+      lastName: yd.string().required(),
+      password: yd.string().password().required(),
+    }),
+    validateToken({ type: 'invite' }),
+    async (ctx) => {
+      const invite = await Invite.findOneAndUpdate(
+        {
+          email: ctx.state.jwt.sub,
+        },
+        {
+          $set: { status: 'accepted' },
+        }
+      );
+      if (!invite) {
+        return ctx.throw(400, 'Invite could not be found');
+      }
 
-    return next();
-  })
-  .use(authenticate({ type: 'user' }))
-  .use(fetchUser)
-  .use(requirePermissions({ endpoint: 'users', permission: 'read', scope: 'global' }))
+      let user = await User.findOne({
+        email: invite.email,
+      });
+
+      if (user) {
+        const token = createAuthToken(ctx, user);
+        await user.save();
+        ctx.body = {
+          data: {
+            token,
+          },
+        };
+      } else {
+        const { email, role } = invite;
+        const user = new User({
+          ...ctx.request.body,
+          email,
+          ...(role && {
+            roles: [
+              {
+                scope: 'global',
+                role,
+              },
+            ],
+          }),
+        });
+
+        const token = await register(ctx, user);
+
+        ctx.body = {
+          data: {
+            token,
+          },
+        };
+      }
+    }
+  )
+  .use(authenticate())
+  .use(requirePermissions('users.read'))
+  .param('id', fetchByParam(Invite))
   .post('/search', validateBody(Invite.getSearchValidation()), async (ctx) => {
     const { data, meta } = await Invite.search(ctx.request.body);
     ctx.body = {
@@ -47,15 +94,16 @@ router
       meta,
     };
   })
-  .use(requirePermissions({ endpoint: 'users', permission: 'write', scope: 'global' }))
+  .use(requirePermissions('users.invite'))
   .post(
     '/',
     validateBody({
-      emails: Joi.array().items(Joi.string().email()).required(),
+      emails: yd.array(yd.string().email()).required(),
+      role: yd.string(),
     }),
     async (ctx) => {
       const { authUser } = ctx.state;
-      const { emails } = ctx.request.body;
+      const { emails, role } = ctx.request.body;
 
       for (let email of [...new Set(emails)]) {
         if ((await User.countDocuments({ email, deleted: false })) > 0) {
@@ -66,7 +114,13 @@ router
             email,
             status: 'invited',
           },
-          { status: 'invited', deleted: false, email, $unset: { deletedAt: 1 } },
+          {
+            status: 'invited',
+            deleted: false,
+            email,
+            role,
+            $unset: { deletedAt: 1 },
+          },
           {
             new: true,
             upsert: true,
@@ -77,12 +131,12 @@ router
       ctx.status = 204;
     }
   )
-  .post('/:inviteId/resend', async (ctx) => {
+  .post('/:id/resend', async (ctx) => {
     const { invite, authUser } = ctx.state;
     await sendInvite(authUser, invite);
     ctx.status = 204;
   })
-  .delete('/:inviteId', async (ctx) => {
+  .delete('/:id', async (ctx) => {
     const { invite } = ctx.state;
     await invite.delete();
     ctx.status = 204;

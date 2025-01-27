@@ -16,23 +16,25 @@ describe('User', () => {
       expect(data.__v).toBeUndefined();
     });
 
-    it('should not expose _password or hashedPassword', () => {
+    it('should not expose password hash', async () => {
       const user = new User({
+        firstName: 'Neo',
+        lastName: 'One',
+        email: 'foo@bar.com',
         password: 'fake password',
-        hashedPassword: 'fake hash',
       });
       expect(user._password).toBe('fake password');
-      expect(user.hashedPassword).toBe('fake hash');
+      await user.save();
 
       const data = JSON.parse(JSON.stringify(user));
       expect(data.password).toBeUndefined();
       expect(data._password).toBeUndefined();
-      expect(data.hashedPassword).toBeUndefined();
+      expect(data.authenticators).toBeUndefined();
     });
   });
 
   describe('validation', () => {
-    it('should validate email field', () => {
+    it('should validate email field', async () => {
       let user;
 
       user = new User({
@@ -40,37 +42,21 @@ describe('User', () => {
         lastName: 'One',
         email: 'good@email.com',
       });
-      expect(user.validateSync()).toBeUndefined();
+      await expect(user.validate()).resolves.not.toThrow();
 
       user = new User({
         firstName: 'Neo',
         lastName: 'One',
         email: 'bad@email',
       });
-      expect(user.validateSync()).toBeInstanceOf(mongoose.Error.ValidationError);
+      await expect(user.validate()).rejects.toThrow(mongoose.Error.ValidationError);
 
       user = new User({
         firstName: 'Neo',
         lastName: 'One',
         email: null,
       });
-      expect(user.validateSync()).toBeInstanceOf(mongoose.Error.ValidationError);
-    });
-  });
-
-  describe('createAuthToken', () => {
-    it('should add an authToken', () => {
-      const user = new User({
-        firstName: 'Neo',
-        lastName: 'One',
-        email: 'good@email.com',
-      });
-
-      user.createAuthToken({ ip: '122.312.31.2', userAgent: 'test' });
-      const authInfo = user.authInfo;
-      expect(authInfo[0].ip).toEqual('122.312.31.2');
-      expect(authInfo[0].userAgent).toEqual('test');
-      expect(authInfo.length).toBe(1);
+      await expect(user.validate()).rejects.toThrow(mongoose.Error.ValidationError);
     });
   });
 });

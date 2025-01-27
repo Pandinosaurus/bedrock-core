@@ -2,28 +2,33 @@ import React from 'react';
 import { Table, Button, Divider, Segment } from 'semantic';
 import { Link } from 'react-router-dom';
 
-import { formatDateTime } from 'utils/date';
-import { request } from 'utils/api';
 import screen from 'helpers/screen';
-import {
-  HelpTip,
-  Breadcrumbs,
-  Layout,
-  Search,
-  SearchFilters,
-} from 'components';
+
+import HelpTip from 'components/HelpTip';
+import Layout from 'components/Layout';
+import Search from 'components/Search';
+import Breadcrumbs from 'components/Breadcrumbs';
+import SearchFilters from 'components/Search/Filters';
+
 import EditShop from 'modals/EditShop';
 
-// --- Generator: list-imports
-import allCountries from 'utils/countries';
+import { formatDateTime } from 'utils/date';
+import { request } from 'utils/api';
 
-import Actions from '../Actions';
+// --- Generator: list-imports
+/* eslint-disable-next-line */
+import { Image } from 'semantic';
+import allCountries from 'utils/countries';
+import { urlForUpload } from 'utils/uploads';
+
 const countries = allCountries.map(({ countryCode, nameEn }) => ({
   value: countryCode,
   text: nameEn,
   key: countryCode,
 }));
 // --- Generator: end
+
+import Actions from '../Actions';
 
 @screen
 export default class ShopList extends React.Component {
@@ -40,6 +45,15 @@ export default class ShopList extends React.Component {
     const { data } = await request({
       method: 'POST',
       path: '/1/users/search',
+      body: props,
+    });
+    return data;
+  };
+
+  fetchCategories = async (props) => {
+    const { data } = await request({
+      method: 'POST',
+      path: '/1/categories/search',
       body: props,
     });
     return data;
@@ -77,7 +91,7 @@ export default class ShopList extends React.Component {
       <Search.Provider
         onDataNeeded={this.onDataNeeded}
         filterMapping={this.getFilterMapping()}>
-        {({ items, getSorted, setSort, reload }) => {
+        {({ items: shops, getSorted, setSort, reload }) => {
           return (
             <React.Fragment>
               <Breadcrumbs active="Shops" />
@@ -103,10 +117,17 @@ export default class ShopList extends React.Component {
                       label="Country"
                     />
                     <SearchFilters.Dropdown
-                      onDataNeeded={(name) => this.fetchOwners({ name })}
                       search
+                      onDataNeeded={this.fetchOwners}
                       name="owner"
                       label="Owner"
+                    />
+                    <SearchFilters.Dropdown
+                      search
+                      multiple
+                      onDataNeeded={this.fetchCategories}
+                      name="categories"
+                      label="Categories"
                     />
                     <SearchFilters.DateRange
                       label="Created At"
@@ -117,14 +138,14 @@ export default class ShopList extends React.Component {
 
                   <Layout horizontal stackable center right>
                     <Search.Total />
-                    <SearchFilters.Search name="keyword" />
+                    <SearchFilters.Keyword />
                   </Layout>
                 </Layout>
               </Segment>
 
               <Search.Status />
 
-              {items.length !== 0 && (
+              {shops.length !== 0 && (
                 <Table celled sortable>
                   <Table.Header>
                     <Table.Row>
@@ -135,7 +156,7 @@ export default class ShopList extends React.Component {
                         sorted={getSorted('name')}>
                         Name
                       </Table.HeaderCell>
-                      <Table.HeaderCell width={3}>Description</Table.HeaderCell>
+                      <Table.HeaderCell>Image</Table.HeaderCell>
                       {/* --- Generator: end */}
                       <Table.HeaderCell
                         onClick={() => setSort('createdAt')}
@@ -152,25 +173,32 @@ export default class ShopList extends React.Component {
                     </Table.Row>
                   </Table.Header>
                   <Table.Body>
-                    {items.map((item) => {
+                    {shops.map((shop) => {
                       return (
-                        <Table.Row key={item.id}>
+                        <Table.Row key={shop.id}>
                           {/* --- Generator: list-body-cells */}
                           <Table.Cell>
-                            <Link to={`/shops/${item.id}`}>{item.name}</Link>
+                            <Link to={`/shops/${shop.id}`}>{shop.name}</Link>
                           </Table.Cell>
-                          <Table.Cell>{item.description}</Table.Cell>
+                          <Table.Cell>
+                            {shop.images.length > 1 && (
+                              <Image
+                                size="tiny"
+                                src={urlForUpload(shop.images[0], true)}
+                              />
+                            )}
+                          </Table.Cell>
                           {/* --- Generator: end */}
                           <Table.Cell>
-                            {formatDateTime(item.createdAt)}
+                            {formatDateTime(shop.createdAt)}
                           </Table.Cell>
                           <Table.Cell textAlign="center" singleLine>
                             <EditShop
-                              shop={item}
+                              shop={shop}
                               trigger={<Button basic icon="pen-to-square" />}
                               onSave={reload}
                             />
-                            <Actions item={item} reload={reload} />
+                            <Actions shop={shop} reload={reload} />
                           </Table.Cell>
                         </Table.Row>
                       );

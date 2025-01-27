@@ -3,16 +3,14 @@ import { merge, omit } from 'lodash';
 import { withRouter } from 'react-router-dom';
 
 import { request, hasToken, setToken } from 'utils/api';
+import { getOrganization, setOrganization } from 'utils/organization';
 import { trackSession } from 'utils/analytics';
 import { captureError } from 'utils/sentry';
 import { wrapContext } from 'utils/hoc';
 import { localStorage } from 'utils/storage';
 
-import { withTheme } from './theme';
-
 const SessionContext = React.createContext();
 
-@withTheme
 @withRouter
 export class SessionProvider extends React.PureComponent {
   constructor(props) {
@@ -20,9 +18,10 @@ export class SessionProvider extends React.PureComponent {
     this.state = {
       user: null,
       error: null,
+      ready: false,
       loading: true,
-      stored: this.loadStored(),
       organization: null,
+      stored: this.loadStored(),
     };
   }
 
@@ -64,12 +63,7 @@ export class SessionProvider extends React.PureComponent {
           method: 'GET',
           path: '/1/users/me',
         });
-
         const organization = await this.loadOrganization();
-
-        if (user.theme) {
-          this.context.setTheme(user.theme, true);
-        }
 
         // Uncomment this line if you want to set up
         // User-Id tracking. https://bit.ly/2DKQYEN.
@@ -79,6 +73,7 @@ export class SessionProvider extends React.PureComponent {
           user,
           organization,
           loading: false,
+          ready: true,
         });
       } catch (error) {
         // eslint-disable-next-line no-console
@@ -90,12 +85,14 @@ export class SessionProvider extends React.PureComponent {
           this.setState({
             error,
             loading: false,
+            ready: true,
           });
         }
       }
     } else {
       this.setState({
         user: null,
+        ready: true,
         loading: false,
       });
     }
@@ -120,20 +117,24 @@ export class SessionProvider extends React.PureComponent {
     this.setState({
       isLoggingIn: true,
     });
-    const { data } = await request({
-      method: 'POST',
-      path: '/1/auth/login',
-      body,
-    });
-    if (data.mfaRequired) {
-      window.sessionStorage.setItem('mfa-auth', JSON.stringify(data));
-      return '/login/verification';
+    try {
+      const { data } = await request({
+        method: 'POST',
+        path: '/1/auth/password/login',
+        body,
+      });
+      const redirect = await this.authenticate(data.token);
+      this.setState({
+        isLoggingIn: false,
+      });
+      return redirect;
+    } catch (error) {
+      this.setState({
+        error,
+        isLoggingIn: false,
+      });
+      throw error;
     }
-    const redirect = await this.authenticate(data.token);
-    this.setState({
-      isLoggingIn: false,
-    });
-    return redirect;
   };
 
   logout = async (redirect) => {
@@ -147,13 +148,13 @@ export class SessionProvider extends React.PureComponent {
           method: 'POST',
           path: '/1/auth/logout',
         });
-      } catch (err) {
+      } catch {
         // JWT token errors may throw here
       }
       setToken(null);
     }
     await this.bootstrap();
-    this.props.history.push('/');
+    this.props.history.push(this.popRedirect() || '/');
   };
 
   authenticate = async (token) => {
@@ -184,35 +185,20 @@ export class SessionProvider extends React.PureComponent {
   // Organizations
 
   loadOrganization = async () => {
-    const organizationId = this.state.stored['organizationId'];
-    if (organizationId) {
+    const organization = getOrganization();
+    if (organization) {
       try {
         const { data } = await request({
           method: 'GET',
-          path: `/1/organizations/${organizationId}`,
+          path: `/1/organizations/${organization}`,
         });
         return data;
       } catch (err) {
         if (err.status < 500) {
-          this.removeStored('organizationId');
+          setOrganization(null);
         }
       }
     }
-  };
-
-  setOrganization = (organization) => {
-    if (organization) {
-      this.setStored('organizationId', organization.id);
-    } else {
-      this.removeStored('organizationId');
-    }
-    // Organizations may affect the context of all pages as well as
-    // persistent header/footer so need to do a hard-reload of the app.
-    window.location.reload();
-  };
-
-  getOrganization = () => {
-    return this.state.organization;
   };
 
   // Session storage
@@ -250,7 +236,7 @@ export class SessionProvider extends React.PureComponent {
       if (str) {
         data = JSON.parse(str);
       }
-    } catch (err) {
+    } catch {
       localStorage.removeItem('session');
     }
     return data || {};
@@ -298,8 +284,6 @@ export class SessionProvider extends React.PureComponent {
           hasRole: this.hasRole,
           isAdmin: this.isAdmin,
           pushRedirect: this.pushRedirect,
-          setOrganization: this.setOrganization,
-          getOrganization: this.getOrganization,
         }}>
         {this.props.children}
       </SessionContext.Provider>

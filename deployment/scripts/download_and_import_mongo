@@ -1,0 +1,46 @@
+#!/bin/bash
+
+set -u # crash on missing env
+set -e # stop on any error
+
+ENVIRONMENT=$1
+
+if [ "$ENVIRONMENT" == "" ]; then
+  echo "Usage: $0 <ENV>"
+  exit 1
+fi
+
+DB="bedrock_${ENVIRONMENT}"
+
+bedrock cloud authorize $ENVIRONMENT
+API_CLI_POD=`kubectl get pods | grep api-cli-deployment | grep -i running | awk '{print $1}'`
+echo "Using API_CLI pod $API_CLI_POD and database $DB"
+
+function exec_remote() {
+  kubectl exec -it $API_CLI_POD -- /bin/bash -c "$*"
+}
+
+echo "Exporting on CLI pod"
+
+# Pass through arguments past the env
+shift
+
+# Capture and display the output simultaneously
+OUTPUT=$(exec_remote "node scripts/database/prepare-export.js --out=/export $@" | tee /dev/tty)
+
+# Check if the output contains help message keywords
+if echo "$OUTPUT" | grep -q "Usage:"; then
+  exit 0
+fi
+
+echo "Transfering export"
+rm -rf ./export
+kubectl cp $API_CLI_POD:/export ./export
+
+echo "Cleaning up CLI pod"
+exec_remote "rm -rf /export"
+
+echo "Restoring dump locally"
+mongorestore --drop --gzip --nsInclude="$DB.*" --nsFrom="*.*_sanitized" --nsTo="*.*" ./export
+echo "Cleaning up locally"
+rm -rf ./export

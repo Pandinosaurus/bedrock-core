@@ -2,16 +2,21 @@
 // before react and react-dom
 import 'react-hot-loader';
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import ReactDOM from 'react-dom';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, Switch, Route } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 
 // Icons
 import { Icon } from 'semantic';
 
-import { SessionProvider, ThemeProvider } from 'stores';
+import { SessionProvider, useSession } from 'stores/session';
+import { ThemeProvider } from 'stores/theme';
+
+import SessionSwitch from 'helpers/SessionSwitch';
 import 'utils/sentry';
+
+import ScrollProvider from 'helpers/ScrollProvider';
 
 import solidIcons from 'semantic/assets/icons/solid.svg';
 import brandIcons from 'semantic/assets/icons/brands.svg';
@@ -21,23 +26,43 @@ Icon.useSet(solidIcons);
 Icon.useSet(brandIcons, 'brands');
 Icon.useSet(regularIcons, 'regular');
 
-// Scrolling
-import ScrollProvider from 'helpers/ScrollProvider';
+import LoadingScreen from 'screens/Loading';
 
-import App from './App';
+import { hasAccess } from 'utils/user';
+
+const App = React.lazy(() => import('./App'));
+const AuthApp = React.lazy(() => import('./auth/App'));
+const DocsApp = React.lazy(() => import('./docs/App'));
+
+function AppSwitch() {
+  const { user } = useSession();
+  if (hasAccess(user)) {
+    return <App />;
+  } else {
+    return <AuthApp />;
+  }
+}
 
 const Wrapper = () => (
   <BrowserRouter>
     <ThemeProvider>
-      <SessionProvider>
-        <HelmetProvider>
-          <ScrollProvider>
-            <App />
-          </ScrollProvider>
-        </HelmetProvider>
-      </SessionProvider>
+      <HelmetProvider>
+        <ScrollProvider>
+          <SessionProvider>
+            <SessionSwitch>
+              <Suspense fallback={<LoadingScreen />}>
+                <Switch>
+                  <Route path="/docs" component={DocsApp} />
+                  <Route path="/" component={AppSwitch} />
+                </Switch>
+              </Suspense>
+            </SessionSwitch>
+          </SessionProvider>
+        </ScrollProvider>
+      </HelmetProvider>
     </ThemeProvider>
   </BrowserRouter>
 );
 
+// eslint-disable-next-line
 ReactDOM.render(<Wrapper />, document.getElementById('root'));

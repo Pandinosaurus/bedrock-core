@@ -1,16 +1,8 @@
 const { applicationMiddleware } = require('../application');
 const { importFixtures } = require('../../../utils/fixtures');
-const { setupDb, teardownDb, context } = require('../../testing');
+const { context } = require('../../testing');
 
 const { ApplicationRequest } = require('./../../../models');
-
-beforeAll(async () => {
-  await setupDb();
-});
-
-afterAll(async () => {
-  await teardownDb();
-});
 
 describe('application', () => {
   it('should set an request id', async () => {
@@ -19,7 +11,7 @@ describe('application', () => {
 
     const ctx = context({
       headers: {
-        apikey: application.apiKey,
+        'api-key': application.apiKey,
       },
     });
 
@@ -36,7 +28,7 @@ describe('application', () => {
     const middleware = applicationMiddleware({ ignorePaths: [] });
     const ctx = context({
       headers: {
-        apikey: application.apiKey,
+        'api-key': application.apiKey,
       },
     });
 
@@ -61,7 +53,7 @@ describe('application', () => {
     const middleware = applicationMiddleware({ ignorePaths: [] });
     const ctx = context({
       headers: {
-        apikey: application.apiKey,
+        'api-key': application.apiKey,
       },
     });
 
@@ -112,5 +104,11 @@ describe('application', () => {
         },
       ],
     });
+  });
+
+  it('should not fail if no key is set', async () => {
+    const middleware = applicationMiddleware({ ignorePaths: [] });
+    const ctx = context();
+    await expect(middleware(ctx, () => {})).resolves.not.toThrow();
   });
 });

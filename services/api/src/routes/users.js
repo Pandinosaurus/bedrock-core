@@ -1,107 +1,79 @@
 const Router = require('@koa/router');
-const Joi = require('joi');
-const mongoose = require('mongoose');
+const yd = require('@bedrockio/yada');
+const { fetchByParam } = require('../utils/middleware/params');
 const { validateBody } = require('../utils/middleware/validate');
-const { authenticate, fetchUser } = require('../utils/middleware/authenticate');
+const { authenticate } = require('../utils/middleware/authenticate');
 const { requirePermissions } = require('../utils/middleware/permissions');
+
 const { exportValidation, csvExport } = require('../utils/csv');
+const { createImpersonateAuthToken } = require('../utils/auth/tokens');
+const { expandRoles, validateUserRoles } = require('./../utils/permissions');
 const { User } = require('../models');
-const { expandRoles } = require('./../utils/permissions');
 
 const roles = require('./../roles.json');
-const permissions = require('./../permissions.json');
 
 const { AuditEntry } = require('../models');
 
 const router = new Router();
 
-const passwordField = Joi.string()
-  .min(6)
-  .message('Your password must be at least 6 characters long. Please try another.');
-
 router
-  .use(authenticate({ type: 'user' }))
-  .use(fetchUser)
-  .param('userId', async (id, ctx, next) => {
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      ctx.throw(404);
-    }
-    const user = await User.findById(id);
-    if (!user) {
-      ctx.throw(404);
-    }
-    ctx.state.user = user;
-    return next();
-  })
+  .use(authenticate())
+  .param('id', fetchByParam(User))
   .get('/me', async (ctx) => {
     const { authUser } = ctx.state;
     ctx.body = {
-      data: expandRoles(authUser),
+      data: expandRoles(authUser, ctx),
     };
   })
   .patch(
     '/me',
     validateBody({
-      firstName: Joi.string(),
-      lastName: Joi.string(),
-      timeZone: Joi.string(),
-      theme: Joi.string(),
+      phone: yd.string().phone(),
+      mfaMethod: yd.string(),
+      firstName: yd.string(),
+      lastName: yd.string(),
+      timeZone: yd.string(),
     }),
     async (ctx) => {
       const { authUser } = ctx.state;
       authUser.assign(ctx.request.body);
-
       await authUser.save();
       ctx.body = {
-        data: expandRoles(authUser),
+        data: expandRoles(authUser, ctx),
       };
     }
   )
-  .post(
-    '/:userId/authenticate',
-    requirePermissions({ endpoint: 'users', permission: 'write', scope: 'global' }),
-    async (ctx) => {
-      const { user } = ctx.state;
-      const authUser = ctx.state.authUser;
+  .post('/:id/authenticate', requirePermissions('users.impersonate'), async (ctx) => {
+    const { user } = ctx.state;
+    const authUser = ctx.state.authUser;
 
-      // Don't allow an superAdmin to imitate another superAdmin
-      const allowedRoles = expandRoles(authUser).roles.reduce(
-        (result, { roleDefinition }) => result.concat(roleDefinition.allowAuthenticationOnRoles || []),
-        []
-      );
+    // Don't allow an superAdmin to imitate another superAdmin
+    const allowedRoles = expandRoles(authUser, ctx).roles.reduce(
+      (result, { roleDefinition }) => result.concat(roleDefinition.allowAuthenticationOnRoles || []),
+      []
+    );
 
-      const isAllowed = [...user.roles].every(({ role }) => allowedRoles.includes(role));
-      if (!isAllowed) {
-        ctx.throw(403, 'You are not allowed to authenticate as this user');
-      }
-
-      const token = authUser.createAuthToken(
-        {
-          ip: ctx.get('x-forwarded-for') || ctx.ip,
-          country: ctx.get('cf-ipcountry'),
-          userAgent: ctx.get('user-agent'),
-        },
-        {
-          // setting user id to the user we are impersonating
-          // this is a special case not to be use for other purposes `sub` is reserved for the user id normally
-          authenticateUser: user.id,
-          // expires in 2 hours (in seconds)
-          exp: Math.floor(Date.now() / 1000) + 120 * 60,
-        }
-      );
-      await authUser.save();
-
-      await AuditEntry.append('Authenticate as user', ctx, {
-        object: user,
-        user: authUser,
-      });
-
-      ctx.body = {
-        data: { token },
-      };
+    const isAllowed = [...user.roles].every(({ role }) => allowedRoles.includes(role));
+    if (!isAllowed) {
+      ctx.throw(403, 'You are not allowed to authenticate as this user');
     }
-  )
-  .use(requirePermissions({ endpoint: 'users', permission: 'read', scope: 'global' }))
+
+    const token = createImpersonateAuthToken(ctx, user, authUser);
+    await authUser.save();
+
+    await AuditEntry.append('Authenticated as user', {
+      ctx,
+      object: user,
+      actor: authUser,
+    });
+
+    ctx.body = {
+      data: {
+        token,
+      },
+    };
+  })
+  .use(requirePermissions('roles.list'))
   .get('/roles', (ctx) => {
     ctx.body = {
       data: roles,
@@ -109,7 +81,8 @@ router
   })
   .get('/permissions', (ctx) => {
     ctx.body = {
-      data: permissions,
+      // TODO: what is needed here?
+      // data: permissions,
     };
   })
   .post(
@@ -126,33 +99,42 @@ router
         return csvExport(ctx, data, { filename });
       }
       ctx.body = {
-        data: data.map((item) => expandRoles(item)),
+        data: data.map((item) => expandRoles(item, ctx)),
         meta,
       };
     }
   )
-  .get('/:userId', async (ctx) => {
+  .get('/:id', async (ctx) => {
     ctx.body = {
-      data: expandRoles(ctx.state.user),
+      data: expandRoles(ctx.state.user, ctx),
     };
   })
-  .use(requirePermissions({ endpoint: 'users', permission: 'write', scope: 'global' }))
+  .use(requirePermissions('users.create'))
   .post(
     '/',
     validateBody(
       User.getCreateValidation({
-        password: passwordField.required(),
+        password: yd.string().password(),
       })
+        .custom((val) => {
+          if (!val.email && !val.phone) {
+            throw new Error('email or phone number is required');
+          }
+        })
+        .custom(validateUserRoles)
     ),
     async (ctx) => {
-      const { email } = ctx.request.body;
-      const existingUser = await User.findOne({ email });
-      if (existingUser) {
+      const { email, phone } = ctx.request.body;
+      if (email && (await User.findOne({ email }))) {
         ctx.throw(400, 'A user with that email already exists');
+      }
+      if (phone && (await User.findOne({ phone }))) {
+        ctx.throw(400, 'A user with that phone number already exists');
       }
       const user = await User.create(ctx.request.body);
 
-      await AuditEntry.append('Created User', ctx, {
+      await AuditEntry.append('Created User', {
+        ctx,
         object: user,
       });
 
@@ -161,40 +143,34 @@ router
       };
     }
   )
-  .patch(
-    '/:userId',
-    validateBody(
-      User.getUpdateValidation().append({
-        roles: (roles) => {
-          return roles.map((role) => {
-            const { roleDefinition, ...rest } = role;
-            return rest;
-          });
-        },
-      })
-    ),
-    async (ctx) => {
-      const { user } = ctx.state;
-      user.assign(ctx.request.body);
-
-      await user.save();
-
-      await AuditEntry.append('Updated user', ctx, {
-        object: user,
-        fields: ['email', 'roles'],
-      });
-
-      ctx.body = {
-        data: user,
-      };
-    }
-  )
-  .delete('/:userId', async (ctx) => {
+  .patch('/:id', validateBody(User.getUpdateValidation().custom(validateUserRoles)), async (ctx) => {
     const { user } = ctx.state;
-    await user.assertNoReferences({
-      except: [AuditEntry],
+    const snapshot = new User(user);
+    user.assign(ctx.request.body);
+    await user.save();
+    await AuditEntry.append('Updated user', {
+      ctx,
+      snapshot,
+      object: user,
+      fields: ['email', 'roles'],
     });
-    await user.delete();
+
+    ctx.body = {
+      data: user,
+    };
+  })
+  .delete('/:id', async (ctx) => {
+    const { user } = ctx.state;
+    try {
+      await user.delete();
+    } catch (err) {
+      ctx.throw(400, err);
+    }
+    await AuditEntry.append('Deleted user', {
+      ctx,
+      object: user,
+      fields: ['email', 'roles'],
+    });
     ctx.status = 204;
   });
 

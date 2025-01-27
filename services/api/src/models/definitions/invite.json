@@ -2,9 +2,11 @@
   "attributes": {
     "email": {
       "type": "String",
-      "trim": true,
       "lowercase": true,
       "required": true
+    },
+    "role": {
+      "type": "String"
     },
     "status": {
       "type": "String",

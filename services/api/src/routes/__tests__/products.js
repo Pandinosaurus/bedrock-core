@@ -1,15 +1,7 @@
 const mongoose = require('mongoose');
 
-const { setupDb, teardownDb, request, createUser } = require('../../utils/testing');
+const { request, createUser } = require('../../utils/testing');
 const { Product } = require('../../models');
-
-beforeAll(async () => {
-  await setupDb();
-});
-
-afterAll(async () => {
-  await teardownDb();
-});
 
 describe('/1/products', () => {
   describe('POST /', () => {
@@ -20,7 +12,7 @@ describe('/1/products', () => {
         '/1/products',
         {
           name: 'some other product',
-          shop: mongoose.Types.ObjectId(),
+          shop: new mongoose.Types.ObjectId(),
         },
         { user }
       );
@@ -36,7 +28,7 @@ describe('/1/products', () => {
       const product = await Product.create({
         name: 'test 1',
         description: 'Some description',
-        shop: mongoose.Types.ObjectId(),
+        shop: new mongoose.Types.ObjectId(),
       });
       const response = await request('GET', `/1/products/${product.id}`, {}, { user });
       expect(response.status).toBe(200);
@@ -47,26 +39,34 @@ describe('/1/products', () => {
   describe('POST /search', () => {
     it('should list out products', async () => {
       const user = await createUser();
-      await Product.deleteMany({});
-
       const product1 = await Product.create({
         name: 'test 1',
         description: 'Some description',
-        shop: mongoose.Types.ObjectId(),
+        shop: new mongoose.Types.ObjectId(),
       });
 
       const product2 = await Product.create({
         name: 'test 2',
         description: 'Some description',
-        shop: mongoose.Types.ObjectId(),
+        shop: new mongoose.Types.ObjectId(),
       });
 
-      const response = await request('POST', '/1/products/search', {}, { user });
+      const response = await request(
+        'POST',
+        '/1/products/search',
+        {
+          sort: {
+            field: 'name',
+            order: 'asc',
+          },
+        },
+        { user }
+      );
 
       expect(response.status).toBe(200);
       const body = response.body;
-      expect(body.data[1].name).toBe(product1.name);
-      expect(body.data[0].name).toBe(product2.name);
+      expect(body.data[0].name).toBe(product1.name);
+      expect(body.data[1].name).toBe(product2.name);
 
       expect(body.meta.total).toBe(2);
     });
@@ -78,7 +78,7 @@ describe('/1/products', () => {
       const product = await Product.create({
         name: 'test 1',
         description: 'Some description',
-        shop: mongoose.Types.ObjectId(),
+        shop: new mongoose.Types.ObjectId(),
       });
       const response = await request('PATCH', `/1/products/${product.id}`, { name: 'new name' }, { user });
       expect(response.status).toBe(200);
@@ -94,7 +94,7 @@ describe('/1/products', () => {
       const product = await Product.create({
         name: 'test 1',
         description: 'Some description',
-        shop: mongoose.Types.ObjectId(),
+        shop: new mongoose.Types.ObjectId(),
       });
       const response = await request('DELETE', `/1/products/${product.id}`, {}, { user });
       expect(response.status).toBe(204);
